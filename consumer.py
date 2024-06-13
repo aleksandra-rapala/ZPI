@@ -19,8 +19,10 @@ from dask_ml.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, roc_auc_score, mean_absolute_error, mean_squared_error, log_loss
 from sklearn.preprocessing import label_binarize
 import numpy as np
+import os
 
-time.sleep(20)
+if (os.getenv('SCHEDULED_RUN', 'false').lower() == 'true'):
+    time.sleep(20)
 #print("KONSUMET")
 
 conf = {

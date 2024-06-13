@@ -50,6 +50,8 @@ services:
       - kafka
     environment:
       - KAFKA_BROKER=kafka:9092
+      - SCHEDULED_RUN=true
+      - DELAY_SECONDS=3600  # Opóźnienie 3600 sekund (1 godzina)
     restart: always
 
 
