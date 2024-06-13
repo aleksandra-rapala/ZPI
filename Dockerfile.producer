@@ -3,7 +3,8 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-COPY producer.py Nowy.csv /app/
+COPY producer.py energy.csv /app/
+COPY attack.csv /app/
 
 RUN pip install confluent_kafka
 

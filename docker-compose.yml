@@ -41,6 +41,9 @@ services:
       - kafka
     environment:
       - KAFKA_BROKER=kafka:9092
+      - MODEL_ATTACK=true
+      - MODEL_ENERGY=false
+      
 
   consumer:
     build:
@@ -50,8 +53,9 @@ services:
       - kafka
     environment:
       - KAFKA_BROKER=kafka:9092
-      - SCHEDULED_RUN=true
-      - DELAY_SECONDS=3600  # Opóźnienie 3600 sekund (1 godzina)
+      - MODEL_ATTACK=true
+      - MODEL_ENERGY=false
+      - DELAY_SECONDS=20  # Opóźnienie 3600 sekund (1 godzina)
     restart: always
 
 

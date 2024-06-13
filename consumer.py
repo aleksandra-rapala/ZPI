@@ -14,15 +14,15 @@ import pandas as pd
 #dask do rozproszonego przetwarzania danych
 import dask.dataframe as dd
 from dask_ml.model_selection import train_test_split
-from dask_ml.linear_model import LogisticRegression
+from dask_ml.linear_model import LinearRegression, LogisticRegression
 #także dask do rozproszonego przetwarzania danych
 from sklearn.metrics import accuracy_score, roc_auc_score, mean_absolute_error, mean_squared_error, log_loss
 from sklearn.preprocessing import label_binarize
 import numpy as np
 import os
 
-if (os.getenv('SCHEDULED_RUN', 'false').lower() == 'true'):
-    time.sleep(20)
+
+
 #print("KONSUMET")
 
 conf = {
@@ -112,64 +112,136 @@ def consume_messages_to_latest():
     return messages
 
 
+def build_model_energy():
+
+
+    try:
+        messages = consume_messages_to_latest()
+    except Exception as e:
+        print(f"Błąd: {e}")
+
+
+    #1) Przetwarzanie danych z użyciem Dask:
+
+    #Dane z Kafki są najpierw wczytywane do Pandas DataFrame,
+    df = pd.DataFrame(messages)
+    # a następnie konwertowane do Dask DataFrame przy użyciu dd.from_pandas().
+    # Dask DataFrame umożliwia rozproszone przetwarzanie dużych zbiorów danych,
+    df = dd.from_pandas(pd.DataFrame(df), npartitions=8)
+
+
+    #print(df)
+
+    # X = df[['feature_1', 'feature_2', 'feature_3', 'feature_4', 'feature_5', 'feature_6', 'feature_7', 'feature_8', 'feature_9', 'feature_10']]
+    # y = df['feature_11']
+
+    X = df[['feature_3', 'feature_4', 'feature_5', 'feature_6', 'feature_7', 'feature_8', 'feature_9', 'feature_10', 'feature_11', 'feature_12', 'feature_13', 'feature_14', 'feature_15', 'feature_16']]
+    y = df['feature_2']
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
+
+    # Inicjalizujemy modelu klasyfikacyjnego
+    clf = LinearRegression()
+    clf.fit(X_train.values.compute(), y_train.values.compute())
+
+
+    #clf.decision_function(X_train.values.compute())
+
+    # Przewidujemy wartości
+    y_pred = clf.predict(X_test.values.compute())
+
+    # Prawdopodobieństwa dla klas (potrzebne do obliczenia AUC i Log Loss)
+    #y_prob = clf.predict_proba(X_test.values.compute())
+
+    #Accuracy
+    #accuracy = accuracy_score(y_test.compute(), y_pred)
+
+    # Obliczamy metryki regresji
+    mae = mean_absolute_error(y_test.values.compute(), y_pred)
+    mse = mean_squared_error(y_test.values.compute(), y_pred)
+    rmse = np.sqrt(mse)
+
+    # Log Loss
+    #log_loss_value = log_loss(y_test.compute(), y_prob)
+
+    #Binarizacja etykiet dla obliczenia AUC
+    #y_test_binarized = label_binarize(y_test.compute(), classes=[0, 1])
+    #auc = roc_auc_score(y_test_binarized, y_prob, multi_class='ovr')
+
+    #print(f"Accuracy: {accuracy}")
+    print(f"Mean Absolute Error: {mae}")
+    print(f"Mean Squared Error: {mse}")
+    print(f"Root Mean Squared Error: {rmse}")
+    #print(f"Log Loss: {log_loss_value}")
+    #print(f"AUC: {auc}")
+    print(len(df))  # Metoda len() ilość odebranych wiadomości
+
+    #print("koniec")
+
+def build_model_attack():
+    try:
+        messages = consume_messages_to_latest()
+    except Exception as e:
+        print(f"Błąd: {e}")
+
+
+    #1) Przetwarzanie danych z użyciem Dask:
+
+    #Dane z Kafki są najpierw wczytywane do Pandas DataFrame,
+    df = pd.DataFrame(messages)
+    # a następnie konwertowane do Dask DataFrame przy użyciu dd.from_pandas().
+    # Dask DataFrame umożliwia rozproszone przetwarzanie dużych zbiorów danych,
+    df = dd.from_pandas(pd.DataFrame(df), npartitions=8)
+
+    #print(df)
+
+    X = df[['feature_1', 'feature_2', 'feature_3', 'feature_4', 'feature_5', 'feature_6', 'feature_7', 'feature_8', 'feature_9', 'feature_10']]
+    y = df['feature_11']
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4, shuffle=False)
+
+    # Inicjalizujemy modelu klasyfikacyjnego
+    clf = LogisticRegression()
+    clf.fit(X_train.values.compute(), y_train.values.compute())
+
+
+    clf.decision_function(X_train.values.compute())
+
+    # Przewidujemy wartości
+    y_pred = clf.predict(X_test.values.compute())
+
+    # Prawdopodobieństwa dla klas (potrzebne do obliczenia AUC i Log Loss)
+    y_prob = clf.predict_proba(X_test.values.compute())
+
+    #Accuracy
+    accuracy = accuracy_score(y_test.compute(), y_pred)
+
+    # Obliczamy metryki regresji
+    mae = mean_absolute_error(y_test.values.compute(), y_pred)
+    mse = mean_squared_error(y_test.values.compute(), y_pred)
+    rmse = np.sqrt(mse)
+
+    # Log Loss
+    #log_loss_value = log_loss(y_test.compute(), y_prob)
+
+    #Binarizacja etykiet dla obliczenia AUC
+    #y_test_binarized = label_binarize(y_test.compute(), classes=[0, 1])
+    #auc = roc_auc_score(y_test_binarized, y_prob, multi_class='ovr')
+
+    print(f"Accuracy: {accuracy}")
+    print(f"Mean Absolute Error: {mae}")
+    print(f"Mean Squared Error: {mse}")
+    print(f"Root Mean Squared Error: {rmse}")
+    #print(f"Log Loss: {log_loss_value}")
+    #print(f"AUC: {auc}")
+    print(len(df))  # Metoda len() ilość odebranych wiadomości
+
+    #print("koniec")
 
 
 
-try:
-    messages = consume_messages_to_latest()
-except Exception as e:
-    print(f"Błąd: {e}")
+if (os.getenv('MODEL_ENERGY', 'false').lower() == 'true'):
+    build_model_energy()
 
-
-#1) Przetwarzanie danych z użyciem Dask:
-
-#Dane z Kafki są najpierw wczytywane do Pandas DataFrame,
-df = pd.DataFrame(messages)
-# a następnie konwertowane do Dask DataFrame przy użyciu dd.from_pandas().
-# Dask DataFrame umożliwia rozproszone przetwarzanie dużych zbiorów danych,
-df = dd.from_pandas(pd.DataFrame(df), npartitions=8)
-
-#print(df)
-
-X = df[['feature_1', 'feature_2', 'feature_3', 'feature_4', 'feature_5', 'feature_6', 'feature_7', 'feature_8', 'feature_9', 'feature_10']]
-y = df['feature_11']
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4, shuffle=False)
-
-# Inicjalizujemy modelu klasyfikacyjnego
-clf = LogisticRegression()
-clf.fit(X_train.values.compute(), y_train.values.compute())
-
-
-clf.decision_function(X_train.values.compute())
-
-# Przewidujemy wartości
-y_pred = clf.predict(X_test.values.compute())
-
-# Prawdopodobieństwa dla klas (potrzebne do obliczenia AUC i Log Loss)
-y_prob = clf.predict_proba(X_test.values.compute())
-
-#Accuracy
-accuracy = accuracy_score(y_test.compute(), y_pred)
-
-# Obliczamy metryki regresji
-mae = mean_absolute_error(y_test.values.compute(), y_pred)
-mse = mean_squared_error(y_test.values.compute(), y_pred)
-rmse = np.sqrt(mse)
-
-# Log Loss
-#log_loss_value = log_loss(y_test.compute(), y_prob)
-
-#Binarizacja etykiet dla obliczenia AUC
-#y_test_binarized = label_binarize(y_test.compute(), classes=[0, 1])
-#auc = roc_auc_score(y_test_binarized, y_prob, multi_class='ovr')
-
-print(f"Accuracy: {accuracy}")
-print(f"Mean Absolute Error: {mae}")
-print(f"Mean Squared Error: {mse}")
-print(f"Root Mean Squared Error: {rmse}")
-#print(f"Log Loss: {log_loss_value}")
-#print(f"AUC: {auc}")
-print(len(df))  # Metoda len() ilość odebranych wiadomości
-
-#print("koniec")
+elif (os.getenv('MODEL_ATTACK', 'false').lower() == 'true'):
+    build_model_attack()
