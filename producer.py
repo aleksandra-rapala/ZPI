@@ -15,9 +15,6 @@ import os
 conf = {'bootstrap.servers': 'kafka:9092', 'client.id': socket.gethostname()}
 
 
-
-
-
 def generate_data_attack(start_row=0):
     label_mapping = {'neptune': 1, 'normal': 0}
     with open('attack.csv', 'r') as csvfile:
@@ -26,7 +23,6 @@ def generate_data_attack(start_row=0):
             next(csvreader)
         for row in csvreader:
             X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11 = row
-            print(X11, flush=True)
             feature_11_numeric = label_mapping.get(X11, 0)
             data = {
                 "feature_1": float(X1),
@@ -45,15 +41,13 @@ def generate_data_attack(start_row=0):
 
 
 def generate_data_energy(start_row=0):
-    #label_mapping = {'neptune': 1, 'normal': 0}
     with open('energy.csv', 'r') as csvfile:
         csvreader = csv.reader(csvfile)
         for _ in range(start_row):
             next(csvreader)
         for row in csvreader:
             X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11, X12, X13, X14, X15, X16 = row
-            print(X2, flush=True)
-            #feature_11_numeric = label_mapping.get(X11, 0)
+
             data = {
                 "feature_2": float(X2),
                 "feature_3": float(X3),
@@ -87,26 +81,21 @@ while True:
         #Generuje nowe dane
 
         if (os.getenv('MODEL_ENERGY', 'false').lower() == 'true'):
-            print("HEdJ")
             activity = generate_data_energy(start_row1)
             start_row1 = start_row1 + 1
-            #print(activity)
             #Wysyła wygenerowane dane do tematu Kafka o nazwie 'historic_data'
             p.produce('historic_data', activity)
             #Wywołuje p.flush() w celu zapewnienia wysłania wszystkich wiadomości do brokera Kafka.
             p.flush()
 
         elif (os.getenv('MODEL_ATTACK', 'false').lower() == 'true'):
-            print("SIEMA")
             activity = generate_data_attack(start_row1)
             start_row1 = start_row1 + 1
-            #print(activity)
             #Wysyła wygenerowane dane do tematu Kafka o nazwie 'historic_data'
             p.produce('historic_data', activity)
             #Wywołuje p.flush() w celu zapewnienia wysłania wszystkich wiadomości do brokera Kafka.
             p.flush()
 
-        
         #Oczekuje przez sekundę przed ponownym wykonaniem pętli.
         time.sleep(1)
     #W przypadku wystąpienia błędu, wyświetla komunikat i czeka 3 sekundy przed ponownym wykonaniem pętli.

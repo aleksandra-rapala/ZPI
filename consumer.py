@@ -1,8 +1,5 @@
-#część systemu przetwarzania strumieniowego danych, 
-#który odczytuje dane z tematu Kafka, 
-#przetwarza je, szkoli model regresji liniowej, 
-#a następnie ocenia wydajność tego modelu na zbiorze testowym
-
+#część systemu przetwarzania strumieniowego danych, który odczytuje dane z tematu Kafka, 
+#przetwarza je, szkoli model, a następnie ocenia wydajność tego modelu na zbiorze testowym
 
 #Importuje confluent_kafka do obsługi komunikacji z Kafka
 from confluent_kafka import Consumer, KafkaException, KafkaError, TopicPartition
@@ -15,15 +12,13 @@ import pandas as pd
 import dask.dataframe as dd
 from dask_ml.model_selection import train_test_split
 from dask_ml.linear_model import LinearRegression, LogisticRegression
-#także dask do rozproszonego przetwarzania danych
-from sklearn.metrics import accuracy_score, roc_auc_score, mean_absolute_error, mean_squared_error, log_loss
+
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, explained_variance_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, log_loss
+
 from sklearn.preprocessing import label_binarize
 import numpy as np
 import os
-
-
-
-#print("KONSUMET")
 
 conf = {
     'bootstrap.servers': 'kafka:9092',
@@ -32,7 +27,8 @@ conf = {
     'client.id': socket.gethostname()
 }
 
-#pobiera najnowsze dostępne offsety dla wszystkich partycji określonego tematu w Kafka, co pozwala na monitorowanie, jakie wiadomości są najnowsze w danym temacie.
+#pobiera najnowsze dostępne offsety dla wszystkich partycji określonego tematu w Kafka
+#co pozwala na monitorowanie, jakie wiadomości są najnowsze w danym temacie.
 def get_latest_offsets(consumer, topic):
     #Inicjalizacja słownika latest_offsets, będzie przechowywał najnowsze offsety dla każdej partycji
     latest_offsets = {}
@@ -52,7 +48,8 @@ def get_latest_offsets(consumer, topic):
     return latest_offsets
 
 
-#Funkcja consume_messages_to_latest jest odpowiedzialna za konsumowanie wiadomości z topiku Kafka do momentu osiągnięcia najnowszego offsetu w każdej partycji. 
+#Funkcja consume_messages_to_latest jest odpowiedzialna za konsumowanie wiadomości 
+#z topiku Kafka do momentu osiągnięcia najnowszego offsetu w każdej partycji. 
 def consume_messages_to_latest():
     #Tworzy instancję konsumenta Kafka za pomocą dostarczonej konfiguracji conf.
     c = Consumer(conf)
@@ -112,16 +109,12 @@ def consume_messages_to_latest():
     return messages
 
 
+#Budowanie modelu REGRESJI LINIOWEJ
 def build_model_energy():
-
-
     try:
         messages = consume_messages_to_latest()
     except Exception as e:
         print(f"Błąd: {e}")
-
-
-    #1) Przetwarzanie danych z użyciem Dask:
 
     #Dane z Kafki są najpierw wczytywane do Pandas DataFrame,
     df = pd.DataFrame(messages)
@@ -129,82 +122,67 @@ def build_model_energy():
     # Dask DataFrame umożliwia rozproszone przetwarzanie dużych zbiorów danych,
     df = dd.from_pandas(pd.DataFrame(df), npartitions=8)
 
-
-    #print(df)
-
-    # X = df[['feature_1', 'feature_2', 'feature_3', 'feature_4', 'feature_5', 'feature_6', 'feature_7', 'feature_8', 'feature_9', 'feature_10']]
-    # y = df['feature_11']
-
+    # Wybieramy kolumny do X i y
     X = df[['feature_3', 'feature_4', 'feature_5', 'feature_6', 'feature_7', 'feature_8', 'feature_9', 'feature_10', 'feature_11', 'feature_12', 'feature_13', 'feature_14', 'feature_15', 'feature_16']]
     y = df['feature_2']
 
+    # Dzielimy dane na zestawy treningowe i testowe
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
 
-    # Inicjalizujemy modelu klasyfikacyjnego
+    #Inicjalizujemy modelu regresji liniowej
     clf = LinearRegression()
+
+    # Trenujemy model
     clf.fit(X_train.values.compute(), y_train.values.compute())
-
-
-    #clf.decision_function(X_train.values.compute())
 
     # Przewidujemy wartości
     y_pred = clf.predict(X_test.values.compute())
 
-    # Prawdopodobieństwa dla klas (potrzebne do obliczenia AUC i Log Loss)
-    #y_prob = clf.predict_proba(X_test.values.compute())
-
-    #Accuracy
-    #accuracy = accuracy_score(y_test.compute(), y_pred)
-
     # Obliczamy metryki regresji
-    mae = mean_absolute_error(y_test.values.compute(), y_pred)
-    mse = mean_squared_error(y_test.values.compute(), y_pred)
+    mae = mean_absolute_error(y_test.compute(), y_pred)
+    mse = mean_squared_error(y_test.compute(), y_pred)
     rmse = np.sqrt(mse)
+    r2 = r2_score(y_test.compute(), y_pred)
+    explained_variance = explained_variance_score(y_test.compute(), y_pred)
+    mape = np.mean(np.abs((y_test.compute() - y_pred) / y_test.compute())) * 100
 
-    # Log Loss
-    #log_loss_value = log_loss(y_test.compute(), y_prob)
-
-    #Binarizacja etykiet dla obliczenia AUC
-    #y_test_binarized = label_binarize(y_test.compute(), classes=[0, 1])
-    #auc = roc_auc_score(y_test_binarized, y_prob, multi_class='ovr')
-
-    #print(f"Accuracy: {accuracy}")
     print(f"Mean Absolute Error: {mae}")
     print(f"Mean Squared Error: {mse}")
     print(f"Root Mean Squared Error: {rmse}")
-    #print(f"Log Loss: {log_loss_value}")
-    #print(f"AUC: {auc}")
-    print(len(df))  # Metoda len() ilość odebranych wiadomości
+    print(f"R-squared: {r2}")
+    print(f"Explained Variance: {explained_variance}")
+    print(f"Mean Absolute Percentage Error: {mape}")
+    print(f"Ilość odebranych wiadomości: {len(df)}")
 
-    #print("koniec")
 
+
+#Budowanie modelu KLASYFIKACJI
 def build_model_attack():
     try:
         messages = consume_messages_to_latest()
     except Exception as e:
         print(f"Błąd: {e}")
 
-
-    #1) Przetwarzanie danych z użyciem Dask:
-
     #Dane z Kafki są najpierw wczytywane do Pandas DataFrame,
     df = pd.DataFrame(messages)
     # a następnie konwertowane do Dask DataFrame przy użyciu dd.from_pandas().
     # Dask DataFrame umożliwia rozproszone przetwarzanie dużych zbiorów danych,
     df = dd.from_pandas(pd.DataFrame(df), npartitions=8)
 
-    #print(df)
-
+    # Wybieramy kolumny do X i y
     X = df[['feature_1', 'feature_2', 'feature_3', 'feature_4', 'feature_5', 'feature_6', 'feature_7', 'feature_8', 'feature_9', 'feature_10']]
     y = df['feature_11']
 
+    # Dzielimy dane na zestawy treningowe i testowe
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4, shuffle=False)
 
-    # Inicjalizujemy modelu klasyfikacyjnego
+    # Inicjalizujemy model klasyfikacyjny
     clf = LogisticRegression()
+
+    # Trenujemy model
     clf.fit(X_train.values.compute(), y_train.values.compute())
 
-
+    # Użycie decision_function do uzyskania odległości od hiperpowierzchni decyzyjnej
     clf.decision_function(X_train.values.compute())
 
     # Przewidujemy wartości
@@ -213,33 +191,38 @@ def build_model_attack():
     # Prawdopodobieństwa dla klas (potrzebne do obliczenia AUC i Log Loss)
     y_prob = clf.predict_proba(X_test.values.compute())
 
-    #Accuracy
+
+
+    # Accuracy
     accuracy = accuracy_score(y_test.compute(), y_pred)
+    # Precision
+    precision = precision_score(y_test.compute(), y_pred)
+    # Recall
+    recall = recall_score(y_test.compute(), y_pred)
+    # F1 Score
+    f1 = f1_score(y_test.compute(), y_pred)
+    # Log Loss
+    logloss = log_loss(y_test.compute(), y_prob)
 
     # Obliczamy metryki regresji
     mae = mean_absolute_error(y_test.values.compute(), y_pred)
     mse = mean_squared_error(y_test.values.compute(), y_pred)
     rmse = np.sqrt(mse)
 
-    # Log Loss
-    #log_loss_value = log_loss(y_test.compute(), y_prob)
-
-    #Binarizacja etykiet dla obliczenia AUC
-    #y_test_binarized = label_binarize(y_test.compute(), classes=[0, 1])
-    #auc = roc_auc_score(y_test_binarized, y_prob, multi_class='ovr')
-
     print(f"Accuracy: {accuracy}")
+    print(f"Precision: {precision}")
+    print(f"Recall: {recall}")
+    print(f"F1 Score: {f1}")
+    print(f"Log Loss: {logloss}")
+
     print(f"Mean Absolute Error: {mae}")
     print(f"Mean Squared Error: {mse}")
     print(f"Root Mean Squared Error: {rmse}")
-    #print(f"Log Loss: {log_loss_value}")
-    #print(f"AUC: {auc}")
-    print(len(df))  # Metoda len() ilość odebranych wiadomości
-
-    #print("koniec")
+    print(f"Ilość odebranych wiadomości: {len(df)}")
 
 
 
+#PROGRAM GŁÓWNY
 if (os.getenv('MODEL_ENERGY', 'false').lower() == 'true'):
     build_model_energy()
 
